@@ -7,10 +7,17 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+type ChatMessage struct {
+	Username string `json:"username"`
+	Text     string `json:"text"`
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
+var clients = make(map[*websocket.Conn]bool)
+var broadcast = make(chan ChatMessage)
 
 func websocketEndpoint(w http.ResponseWriter, r *http.Request) {
 	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
@@ -21,20 +28,36 @@ func websocketEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer conn.Close()
+	clients[conn] = true
 	reader(conn)
 }
 
 func reader(conn *websocket.Conn) {
 	for {
-		// Read message from browser
-		_, p, err := conn.ReadMessage()
+		var chatMessage ChatMessage
+		err := conn.ReadJSON(&chatMessage)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 
 		// Broadcast message to all connected clients
-		log.Println("Received message: ", string(p))
+		log.Println("Received message: ", string(chatMessage.Text))
+		broadcast <- chatMessage
+	}
+}
+
+func handleMessages() {
+	for {
+		chatMessage := <-broadcast
+		for client := range clients {
+			err := client.WriteJSON(chatMessage)
+			if err != nil {
+				log.Println(err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
 	}
 }
 
@@ -45,6 +68,9 @@ func setupRoutes() {
 
 func main() {
 	log.Println("Starting http server...")
+
 	setupRoutes()
+	go handleMessages()
+
 	log.Fatal(http.ListenAndServe(":4444", nil))
 }
