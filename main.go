@@ -20,6 +20,7 @@ func websocketEndpoint(w http.ResponseWriter, r *http.Request) {
 		log.Println(err)
 	}
 
+	defer conn.Close()
 	reader(conn)
 }
 
