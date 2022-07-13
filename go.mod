@@ -1,4 +1,4 @@
-module github.com/frankolson/gochat
+module github.com/frankolson/go-chat
 
 go 1.18
 
