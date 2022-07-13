@@ -1,14 +1,40 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	// "github.com/gorilla/websocket"
+
+	"github.com/gorilla/websocket"
 )
 
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+}
+
 func websocketEndpoint(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Websockets are not supported yet")
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println(err)
+	}
+
+	reader(conn)
+}
+
+func reader(conn *websocket.Conn) {
+	for {
+		// Read message from browser
+		_, p, err := conn.ReadMessage()
+		if err != nil {
+			log.Println(err)
+			return
+		}
+
+		// Broadcast message to all connected clients
+		log.Println("Received message: ", string(p))
+	}
 }
 
 func setupRoutes() {
@@ -16,7 +42,6 @@ func setupRoutes() {
 	http.HandleFunc("/websocket", websocketEndpoint)
 }
 
-// http server from html file
 func main() {
 	log.Println("Starting http server...")
 	setupRoutes()
